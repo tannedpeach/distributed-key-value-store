@@ -41,7 +41,7 @@ Carefully read the three resources above. This class requires closely obeying th
 
 ```bash
 $ cd ~
-$ git clone https://github.com/Columbia-COMS-4113/coms-4113-assignments-fall-2024-yourusername.git 4113
+$ git clone https://github.com/Columbia-COMS-4113/coms-4113-assignments-yourusername.git 4113
 # You should be required to input your username and password here. 
 # You should use `personal access token` as your password. Or clone via SSH.
 # For instructions on generating and using personal access token, see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token.
