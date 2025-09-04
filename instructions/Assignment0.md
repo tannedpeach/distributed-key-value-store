@@ -39,6 +39,8 @@ Carefully read the three resources above. This class requires closely obeying th
  
  We are using Github for distributing and collecting your assignments. Please check ED for how to set up repository. You will need to develop in a \*nix environment, i.e., Linux or OS X. To install the files in your development environment you need to _clone_ your private repository. Your Github page will have a link (click the green button titled "clone or download").  For simplicity, we assume that you will be working in your $HOME directory; of course, this is optional.
 
+ Please make sure that you join our Google Classroom before attempting the below: [github classroom link](https://classroom.github.com/a/O1PUNwmE)
+
 ```bash
 $ cd ~
 $ git clone https://github.com/Columbia-COMS-4113/coms-4113-assignments-yourusername.git 4113
