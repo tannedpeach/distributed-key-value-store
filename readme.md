@@ -7,5 +7,5 @@
 * [Assignment 5: Model Checking Paxos](instructions/Assignment5.md)
 
 ## Important Reminders:
-* Ensure you are using **[Go 1.23.1](https://go.dev/dl/#go1.23.1)**! To check your installed version: `go version`.
+* Ensure you are using **[Go 1.25.1](https://go.dev/dl/#go1.25.1)**! To check your installed version: `go version`.
 * Please try to avoid committing large log files - the grading servers only have so much disk space, and too many large log files can prevent your code from being pulled (and graded) correctly.
