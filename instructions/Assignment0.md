@@ -1,44 +1,51 @@
-# Assignment 0 : Collaboration Policy & Git
+---
 
-### Due: Monday 09/08, 11:59:59pm EST
+layout: homework
+title: "Assignment 0: Collaboration Policy & Git"
+---
+
+### Due: Monday 09/08, 11:59:59pm
 
 **No grace period applies to this homework: you MUST submit the homework by the above date or you will be dis-enrolled from the class.**
 
+**Waitlisted students: Please complete this homework (and HW1) by its deadline if you hope to enroll ultimately.  The bootstrapping instructions for HW0 are posted on courseworks, which will be available to everyone at Columbia until the end of the registration period. To find the courseworks page for the course, search for 4113 on Vergil.**
+
 ## Introduction
 
-This assignment is mainly intended to emphasize the importance of the _no plagiarism_ policy for collaboration. Simultaneously, this assignment will help you get familiar with Github, which you will use to submit your assignments throughout this class. In particular, you will know how to clone the remote assignment repository to your local machine, how to work on your assignments locally, and how to submit them to the remote repository. Please note that we will grade your assignments *only* at the remote repository.
+This assignment is mainly intended to emphasize the importance of the _no copying_ policy for collaboration. Simultaneously, this assignment will help you get familiar with Github, which you will use to submit your assignments throughout this class. In particular, you will know how to clone the remote assignment repository to your local machine, how to work on your assignments locally, and how to submit them to the remote repository. Please note that we will grade your assignments *only* at the remote repository.
 
 To begin working on this assignment, you'll need to first join the 4113 Github Classroom, and then submit a form regarding your github name.
 Links for both the Github Classroom and the form will be distributed over Ed and through Courseworks Announcements before the first class.
 
-## Part I: Zero Tolerance on Plagiarism
+## Part I: Zero Tolerance on Cheat Code
+
 ### Reading
 The Computer Science department has a page on academic integrity, avaiable at
- [Policies and Procedures Regarding Academic
- Honesty](https://www.cs.columbia.edu/academic/academic-honesty/).
- 
-CS Professor Jae Woo Lee has a very [accessible description](https://www.cs.columbia.edu/~jae/honesty.html) of the preceding policies in the context of his classes, which applies to this class as well. He defines the term of "cheat code," i.e., code inspired from or directly copied from someone else's code.
+[Policies and Procedures Regarding Academic Honesty](https://www.cs.columbia.edu/academic/academic-honesty/). The University also has a new [AI-centric policy](https://provost.columbia.edu/content/office-senior-vice-provost/ai-policy). Finally, CS Professor Jae Woo Lee has a very [accessible description](https://www.cs.columbia.edu/~jae/honesty.html) of the preceding policies in the context of his classes, which applies to this class as well.  He defines the term of "cheat code," i.e., code inspired from or directly copied from someone else's code. In this course, we override the definition of "someone else's code" to include both code developed by another human (whether or not you know that person or just access their code somewhere) and a generative AI (as defined in the university's AI policy). 
 
-Carefully read the resources above. This class requires closely obeying the Computer Science Policies and Procedures Regarding Academic Honesty, and has zero tolerance on ``cheat code'' for all assignments.  In particular, you must write all the code you hand in, except for code that we give you as part of the assignments. You are not allowed to look at anyone else's solution (including solutions on the Internet, if there are any), and you are not allowed to look at code from previous years. You may discuss the assignments with other students, but you may not write pseudocode together, look at or copy each other's code. Please do not publish your code or make it available to future students -- for example, please do not make your code visible on Github.
+Carefully read the three resources above. This class requires closely obeying the Computer Science Policies and Procedures Regarding Academic Honesty, and has zero tolerance on ``cheat code'' for all assignments.  In particular, you must write all the code you hand in, except for code that we give you as part of the assignments. You are not allowed to look at anyone else's solution (including solutions on the Internet or AI-generated solutions), and you are not allowed to look at code from previous years. You may discuss the assignments with other students, but you may not write pseudocode together, look at or copy each other's code. You are not allowed to publish your code or make it available to future students -- for example, do not make your code visible on Github either now or in the future. 
 
-For each programming assignment, we will use software to check for plagiarized code.
+ For each programming assignment, we will use software to check for cheat code.
 
-Remember: by "zero tolerance" we mean that the *minimum* punishment for plagiarism on any assignment is an "F" for this class.
+ Remember: by "zero tolerance" we mean that the *minimum* punishment for cheating on any assignment is an "F" for this class.
 
 ### Agreeing to Course Policies
 
-After you have read the above resources, please "sign" `collaboration_policy.txt` located in your assignments root directory with your name, UNI, and the date.
+ After you have read the above resources, please "sign" `collaboration_policy.txt` located in your assignments root directory with your name, UNI, and the date.
 
 ## Part II: Using Git
 
-All programming assignments, including Assignment 0, require Git for submission. You'll fetch the initial assignment software with [Git](http://git.or.cz/) (a version control system). To learn more about Git, take a look at the [Atlassian's Git Tutorial](https://www.atlassian.com/git/tutorials/what-is-version-control).  We will generally provide you with the necessary commands to submit each assignment.  However, you should read this tutorial to understand how the system works, especially if this is your first time using Git.
-
-We are using Github for distributing and collecting your assignments. Please check ED for how to set up repository. You will need to develop in a \*nix environment, i.e., Linux or OS X. To install the files in your development environment you need to _clone_ your private repository. Your Github page will have a link (click the green button titled "clone or download").  For simplicity, we assume that you will be working in your $HOME directory; of course, this is optional.
+ All programming assignments, including Assignment 0, require Git for submission. You'll fetch the initial assignment software with [Git](http://git.or.cz/) (a version control system). To learn more about Git, take a look at the [Atlassian's Git Tutorial](https://www.atlassian.com/git/tutorials/what-is-version-control).  We will generally provide you with the necessary commands to submit each assignment.  However, you should read this tutorial to understand how the system works, especially if this is your first time using Git.
+ 
+ We are using Github for distributing and collecting your assignments. Please check ED for how to set up repository. You will need to develop in a \*nix environment, i.e., Linux or OS X. To install the files in your development environment you need to _clone_ your private repository. Your Github page will have a link (click the green button titled "clone or download").  For simplicity, we assume that you will be working in your $HOME directory; of course, this is optional.
 
 ```bash
 $ cd ~
-$ git clone https://github.com/Columbia-COMS-4113/coms-4113-assignments-fall-2023-yourusername.git 4113
-# You should be required to input your username and password here. You should use `personal access token` as your password. For instruction on generating and using personal access token, see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token.
+$ git clone https://github.com/Columbia-COMS-4113/coms-4113-assignments-fall-2024-yourusername.git 4113
+# You should be required to input your username and password here. 
+# You should use `personal access token` as your password. Or clone via SSH.
+# For instructions on generating and using personal access token, see https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token.
+# For instructions on cloning via SSH, see https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent and https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
 $ ls 4113
 collaboration_policy.txt
 hw5
@@ -61,7 +68,7 @@ You should do this early and often!  You can _push_ your changes to Github after
 $ git push origin master
 ```
 
-Please let us know that you've gotten this far in the assignment by pushing a _tag_ to Github.
+Please let us know that you've gotten this far in the assignment by pushing a _tag_ to Github. 
 
 ```bash
 $ git tag -a -m "i got git and cloned the assignments" gotgit
@@ -72,7 +79,7 @@ Tags are used by developers for version control; think of them as "super commits
 
 ### Part 3: Submitting Assignment 0
 
-Now you need to submit your assignment 0, which confirms that you have read the collaboration policy and will comply. If you did not do so earlier, be sure to open the "collaboration\_policy.txt" file, and sign it by typing your name, UNI, and date. Then, commit your change and push it to the remote repository by doing the following:
+ Now you need to submit your assignment 0, which confirms that you have read the collaboration policy and will comply. If you did not do so earlier, be sure to open the "collaboration\_policy.txt" file, and sign it by typing your name, UNI, and date. Then, commit your change and push it to the remote repository by doing the following:
 
 ```bash
 $ git commit -am "[you fill me in]"
