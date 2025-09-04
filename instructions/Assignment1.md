@@ -21,7 +21,7 @@ Please refer to Assignment 0.
 
 ### Software
 
-You'll implement this assignment (and all the assignments) in [Go 1.23.1](https://go.dev/dl/#go1.23.1). The Go web site contains lots of
+You'll implement this assignment (and all the assignments) in [Go 1.25.1](https://go.dev/dl/#go1.25.1). The Go web site contains lots of
 tutorial information which you may want to look at. We supply you with
 a non-distributed MapReduce implementation, and a partial
 implementation of a distributed implementation (just the boring bits).
