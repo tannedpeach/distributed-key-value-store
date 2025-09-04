@@ -2,7 +2,7 @@
 
 ### Due: Monday 09/15, 11:59:59pm EST
 
-**Ensure you are using **[Go 1.23.1](https://go.dev/dl/#go1.23.1)**! To check your installed version: `go version`.**
+**Ensure you are using **[Go 1.25.1](https://go.dev/dl/#go1.25.1)**! To check your installed version: `go version`.**
 
 ### Introduction
 
