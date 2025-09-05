@@ -1,10 +1,6 @@
----
+# Assignment 0: Collaboration Policy & Git
 
-layout: homework
-title: "Assignment 0: Collaboration Policy & Git"
----
-
-### Due: Monday 09/08, 11:59:59pm
+### Due: Monday 09/08, 11:59:59pm EST
 
 **No grace period applies to this homework: you MUST submit the homework by the above date or you will be dis-enrolled from the class.**
 
