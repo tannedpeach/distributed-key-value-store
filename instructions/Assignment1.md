@@ -118,7 +118,11 @@ To make testing easy for you, run:
 ```bash
 $ ./test-wc.sh
 ```
-and it will report if your solution is correct or not.
+and it will report if your solution is correct or not. If you get a permission denied error, run
+```bash
+$ chmod +x ./test-wc.sh
+```
+to add executable permission to the test file.
 
 Before you start coding reread Section 2 of the [MapReduce
 paper](http://research.google.com/archive/mapreduce-osdi04.pdf) and our code for MapReduce, which is in <tt>mapreduce.go</tt> in
