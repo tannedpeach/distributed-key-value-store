@@ -76,6 +76,7 @@ func InitMapReduce(nmap int, nreduce int,
 	mr.alive = true
 	mr.registerChannel = make(chan string)
 	mr.DoneChannel = make(chan bool)
+	mr.Workers = make(map[string]*WorkerInfo)
 
 	// initialize any additional state here
 	return mr
@@ -210,8 +211,6 @@ func DoMap(JobNumber int, fileName string,
 	}
 	file.Close()
 	res := Map(string(b))
-	fmt.Printf("b1234: %q", res)
-	//fmt.Printf("res1234: %q\n", res)
 	// XXX a bit inefficient. could open r files and run over list once
 	for r := 0; r < nreduce; r++ {
 		file, err = os.Create(ReduceName(fileName, JobNumber, r))
