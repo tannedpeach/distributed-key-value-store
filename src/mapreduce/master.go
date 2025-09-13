@@ -29,31 +29,52 @@ func (mr *MapReduce) KillWorkers() *list.List {
 
 func (mr *MapReduce) RunMaster() *list.List {
 	mapJobDone := make(chan int)
+	reduceJobDone := make(chan int)
+	mapJobs := make(chan int, mr.nMap)
+	reduceJobs := make(chan int, mr.nReduce)
 	for i := 0; i < mr.nMap; i++ {
-		mapWorker := DoJobArgs{mr.file, Map, i, mr.nReduce}
-		go func() {
-			address := <-mr.registerChannel
-			mapResult := call(address, "Worker.DoJob", mapWorker, nil)
-			mapJobDone <- 1
-			mr.registerChannel <- address
-			fmt.Println("mapres", mapResult)
-		}()
+		mapJobs <- i
 	}
+	for i := 0; i < mr.nReduce; i++ {
+		reduceJobs <- i
+	}
+
+	go func() {
+		for j := range mapJobs {
+			mapWorker := DoJobArgs{mr.file, Map, j, mr.nReduce}
+			go func() {
+				address := <-mr.registerChannel
+				mapResult := call(address, "Worker.DoJob", mapWorker, nil)
+				if mapResult {
+					mapJobDone <- 1
+					mr.registerChannel <- address
+				} else {
+					mapJobs <- j
+				}
+			}()
+		}
+	}()
+
 	for i := 0; i < mr.nMap; i++ {
 		<-mapJobDone
 	}
 
-	reduceJobDone := make(chan int)
-	for i := 0; i < mr.nReduce; i++ {
-		reduceWorker := DoJobArgs{mr.file, Reduce, i, mr.nMap}
-		go func() {
-			address := <-mr.registerChannel
-			result := call(address, "Worker.DoJob", reduceWorker, nil)
-			reduceJobDone <- 1
-			mr.registerChannel <- address
-			fmt.Println("reduceres", result)
-		}()
-	}
+	go func() {
+		for k := range reduceJobs {
+			reduceWorker := DoJobArgs{mr.file, Reduce, k, mr.nMap}
+			go func() {
+				address := <-mr.registerChannel
+				result := call(address, "Worker.DoJob", reduceWorker, nil)
+				if result {
+					reduceJobDone <- 1
+					mr.registerChannel <- address
+				} else {
+					reduceJobs <- k
+				}
+			}()
+		}
+	}()
+
 	for i := 0; i < mr.nReduce; i++ {
 		<-reduceJobDone
 	}
