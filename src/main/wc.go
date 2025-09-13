@@ -23,12 +23,8 @@ func Map(value string) *list.List {
 
 	for _, element := range strings.FieldsFunc(value, f) {
 		k1 := mapreduce.KeyValue{Key: element, Value: strconv.Itoa(1)}
-		//fmt.Printf(element)
 		list1.PushBack(k1)
 	}
-	//fmt.Println("list:", list1)
-	//fmt.Printf("Fields are: %q", strings.FieldsFunc(value, f))
-
 	return list1
 
 }
