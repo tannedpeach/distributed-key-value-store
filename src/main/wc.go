@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 import "fmt"
-import "src/mapreduce"
+import "mapreduce"
 import "container/list"
 
 // our simplified version of MapReduce does not supply a
