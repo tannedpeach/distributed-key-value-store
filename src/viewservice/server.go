@@ -18,8 +18,6 @@ type ViewServer struct {
 	currView   View
 	primaryAck bool
 	initDone   bool
-
-	// Your declarations here.
 }
 
 func (vs *ViewServer) UpdateView(v View) {
@@ -44,8 +42,6 @@ func ServerDead(server string, vs *ViewServer) bool {
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	vs.mu.Lock()
 	defer vs.mu.Unlock()
-
-	//v := vs.currView
 
 	vs.pingMap[args.Me] = time.Now()
 
