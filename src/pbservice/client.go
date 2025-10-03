@@ -2,7 +2,7 @@ package pbservice
 
 import (
 	"log"
-	"viewservice"
+	"src/viewservice"
 )
 import "net/rpc"
 import "fmt"
