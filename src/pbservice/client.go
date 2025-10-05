@@ -1,16 +1,15 @@
 package pbservice
 
 import (
-	"log"
+	"crypto/rand"
+	"fmt"
+	"math/big"
+	"net/rpc"
 	"src/viewservice"
+	"time"
 )
-import "net/rpc"
-import "fmt"
 
 // You'll probably need to uncomment these:
-import "time"
-import "crypto/rand"
-import "math/big"
 
 func nrand() int64 {
 	max := big.NewInt(int64(1) << 62)
@@ -19,32 +18,17 @@ func nrand() int64 {
 	return x
 }
 
-var gid = 0
-
 type Clerk struct {
-	vs            *viewservice.Clerk
-	id            int
-	primaryServer string
+	vs       *viewservice.Clerk
+	currView viewservice.View
 	// Your declarations here
 }
 
 func MakeClerk(vshost string, me string) *Clerk {
 	ck := new(Clerk)
-	ck.vs = viewservice.MakeClerk(vshost, me)
-	ck.id = gid
-	gid++
-	ck.vs = viewservice.MakeClerk(vshost, me)
-
+	ck.vs = viewservice.MakeClerk(me, vshost)
+	ck.currView = viewservice.View{Primary: "", Backup: "", Viewnum: 0}
 	return ck
-}
-func (ck *Clerk) PrimaryServer() bool {
-	v, ok := ck.vs.Get()
-	if !ok {
-		log.Println("Client ", ck.id, " couldn't connect to viewservice")
-	} else {
-		ck.primaryServer = v.Primary
-	}
-	return ok
 }
 
 // call() sends an RPC to the rpcname handler on server srv
@@ -84,26 +68,19 @@ func call(srv string, rpcname string,
 // primary replies with the value or the primary
 // says the key doesn't exist (has never been Put().
 func (ck *Clerk) Get(key string) string {
-	ck.PrimaryServer()
-	args := &GetArgs{}
-	args.Key = key
+	args := &GetArgs{Key: key, ServerId: nrand()}
 	var reply GetReply
-	ok := false
-	for true {
-		log.Print("Client ", ck.id, "-> Primary "+
-			viewservice.ConvertToString(ck.primaryServer)+": Get ", key)
-		ok = call(ck.primaryServer, "PBServer.Get", args, &reply)
-		if ok && reply.Err != ErrWrongServer {
-			break
-		}
-		log.Print("Client ", ck.id, " req. didn't go through, ok = ", ok)
-		time.Sleep(10 * viewservice.PingInterval)
-		ck.PrimaryServer()
+
+	ok := call(ck.currView.Primary, "PBServer.Get", args, &reply)
+	for ok == false || reply.Err == ErrWrongServer {
+		time.Sleep(viewservice.PingInterval)
+		ck.currView, _ = ck.vs.Get()
+		ok = call(ck.currView.Primary, "PBServer.Get", args, &reply)
 	}
+
 	if reply.Err == ErrNoKey {
-		reply.Value = ""
+		return ""
 	}
-	log.Print("Client ", ck.id, ": received ", reply.Value, " for key ", key)
 
 	return reply.Value
 }
@@ -111,25 +88,15 @@ func (ck *Clerk) Get(key string) string {
 // tell the primary to update key's value.
 // must keep trying until it succeeds.
 func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
-
-	ck.PrimaryServer()
-	args := &PutArgs{}
-	args.Key = key
-	args.Value = value
+	args := &PutArgs{Key: key, Value: value, DoHash: dohash, ServerId: nrand()}
 	var reply PutReply
-	ok := false
-	for true {
-		log.Print("Client ", ck.id, "-> Primary "+viewservice.ConvertToString(ck.primaryServer)+": Put ", key, " ", value)
-		ok = call(ck.primaryServer, "PBServer.Put", args, &reply)
-		if ok && reply.Err == OK {
-			break
-		}
-		log.Print("Server couldn't complete Put : try again")
-		time.Sleep(3 * viewservice.PingInterval)
-		ck.PrimaryServer()
+	ok := call(ck.currView.Primary, "PBServer.Put", args, &reply)
+	for ok == false || reply.Err != OK {
+		time.Sleep(viewservice.PingInterval)
+		ck.currView, _ = ck.vs.Get()
+		ok = call(ck.currView.Primary, "PBServer.Put", args, &reply)
 	}
-	log.Print("Client ", ck.id, ": Put ", key, " ", value, " completed")
-
+	return reply.PreviousValue
 }
 
 func (ck *Clerk) Put(key string, value string) {

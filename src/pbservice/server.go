@@ -1,15 +1,18 @@
 package pbservice
 
-import "net"
-import "fmt"
-import "net/rpc"
-import "log"
-import "time"
-import "src/viewservice"
-import "os"
-import "syscall"
-import "math/rand"
-import "sync"
+import (
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"net/rpc"
+	"os"
+	"src/viewservice"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
+)
 
 //import "strconv"
 
@@ -23,6 +26,12 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
+type Det struct {
+	Key           string
+	Value         string
+	Oper          string
+	PreviousValue string
+}
 type PBServer struct {
 	l          net.Listener
 	dead       bool // for testing
@@ -31,66 +40,177 @@ type PBServer struct {
 	vs         *viewservice.Clerk
 	done       sync.WaitGroup
 	finish     chan interface{}
-	table      map[string]string
-	mu         sync.Mutex
-	view       viewservice.View
-	init       bool
+
+	table    map[string]string //key-value pair database
+	mu       sync.Mutex
+	currView viewservice.View //current view
+	reqTable map[int64]Det    //requests client sends
+	isSync   bool             //flag to check if primary and backup are updated with eachother
+
 	// Your declarations here.
 }
 
-func (pb *PBServer) Init(args *InitArgs, reply *InitReply) error {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	log.Print("Server ", viewservice.ConvertToString(pb.me), ": INIT ")
-	pb.table = args.Table
-	pb.init = true
+func (pb *PBServer) UpdateBackupPut(args *AppendArgs, reply *AppendReply) error {
+	if pb.currView.Backup != pb.me {
+		reply.Err = ErrWrongServer
+		return nil
+	}
+
+	//check if we've arleady seen this
+	prev, ok := pb.reqTable[args.ServerId]
+	if ok && prev.Key == args.Key && prev.Value == args.Value && prev.Oper == args.Op {
+		reply.Err = OK
+		return nil
+	}
+	//update table
+	if args.Op == "Put" {
+		pb.table[args.Key] = args.Value
+	} else if args.Op == "Append" {
+		p := pb.table[args.Key]
+		pb.table[args.Key] = p + args.Value
+	}
+	pb.reqTable[args.ServerId] = Det{args.Key, args.Value, args.Op, ""}
+	reply.Err = OK
+
 	return nil
+
 }
 
 func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
-	log.Print("Server ", viewservice.ConvertToString(pb.me), ": PUT ",
-		args.Key, " ", args.Value)
 
-	if pb.view.Primary == pb.me && pb.view.Backup != "" {
-		log.Print("Primary ", viewservice.ConvertToString(pb.view.Primary),
-			" -> Backup ", viewservice.ConvertToString(pb.view.Backup),
-			": forwarding Put "+args.Key, " ", args.Value)
-		forward_args := args
-		var forward_reply PutReply
-		ok := call(pb.view.Backup, "PBServer.Put", forward_args, &forward_reply)
-		if !ok {
-			log.Print("Server : Primary can't forward op to backup")
-			reply.Err = "Can't connect to backup"
-			return nil
+	if pb.currView.Primary != pb.me {
+		reply.Err = ErrWrongServer
+		return nil
+	}
+
+	// get previous value for PutHash
+	var prevValue string
+	if args.DoHash {
+		prevValue = pb.table[args.Key]
+	}
+
+	// check if this request has already been seen
+	prev, ok := pb.reqTable[args.ServerId]
+	if ok && prev.Key == args.Key && prev.Value == args.Value && prev.Oper == "Put" {
+		reply.Err = OK
+		if args.DoHash {
+			reply.PreviousValue = prev.PreviousValue
+		}
+		return nil
+	}
+
+	// update table
+	if args.DoHash {
+		// For PutHash, store hash(old_value + new_value)
+		h := hash(prevValue + args.Value)
+		pb.table[args.Key] = strconv.Itoa(int(h))
+	} else {
+		pb.table[args.Key] = args.Value
+	}
+
+	pb.reqTable[args.ServerId] = Det{args.Key, args.Value, "Put", prevValue}
+	reply.Err = OK
+	reply.PreviousValue = prevValue
+
+	// update backup server
+	if pb.currView.Backup != "" {
+		backupArgs := &AppendArgs{args.Key, args.Value, "Put", args.ServerId}
+		var backupReply AppendReply
+		ok := call(pb.currView.Backup, "PBServer.UpdateBackupPut", backupArgs, &backupReply)
+		if !ok || backupReply.Err != OK {
+			pb.isSync = true
 		}
 	}
-	reply.Err = OK
-	k := args.Key
-	v := args.Value
-	pb.table[k] = v
 
 	return nil
+}
+func (pb *PBServer) GetToBackup(args *GetArgs, reply *GetReply) error {
+	//  Should only perform update on the backup server
+	if pb.currView.Backup != pb.me {
+		reply.Err = ErrWrongServer
+		return nil
+	}
 
+	//  Check if we have seen this request before, and if so, return previously calculated value
+	prev, ok := pb.reqTable[args.ServerId]
+	if ok && prev.Key == args.Key {
+		reply.Value = pb.table[args.Key]
+		reply.Err = OK
+		return nil
+	}
+
+	//  Update backup's database with Get operation
+	val, ok := pb.table[args.Key]
+	if ok {
+		reply.Value = val
+		reply.Err = OK
+	} else {
+		reply.Err = ErrNoKey
+	}
+	//  Update requests map
+	pb.reqTable[args.ServerId] = Det{args.Key, "", "Get", ""}
+
+	return nil
 }
 
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
-	if !pb.view.Primary == pb.me {
+	if pb.currView.Primary != pb.me {
 		reply.Err = ErrWrongServer
 		return nil
 	}
-	k := args.Key
-	a, ok := pb.table[k]
+
+	prev, ok := pb.reqTable[args.ServerId]
+	if ok && prev.Key == args.Key {
+		reply.Value = pb.table[args.Key]
+		reply.Err = OK
+		return nil
+	}
+
+	val, ok := pb.table[args.Key]
 	if ok {
-		reply.Value = a
+		reply.Value = val
 		reply.Err = OK
 	} else {
 		reply.Err = ErrNoKey
 	}
+	//  Update requests map
+	pb.reqTable[args.ServerId] = Det{args.Key, "", "Get", ""}
 
+	//  Propagate update to the backup server
+	if pb.currView.Backup != "" {
+		//  Send an RPC request, wait for the reply
+		ok := call(pb.currView.Backup, "PBServer.GetToBackup", args, &reply)
+		//  If something went wrong (e.g. server crashed and update didn't go through)
+		if !ok || reply.Err == ErrWrongServer || reply.Value != pb.table[args.Key] {
+			pb.isSync = true
+		}
+	}
+
+	return nil
+}
+
+func (pb *PBServer) DatabaseToBackup(args *DatabaseToBackupArgs, reply *DatabaseToBackupReply) error {
+	//  Ping viewservice for current view
+	nView, err := pb.vs.Ping(pb.currView.Viewnum)
+	if err != nil {
+		fmt.Errorf("Ping(%v) failed", pb.currView.Viewnum)
+	}
+
+	//  Should only perform update on the backup server
+	if nView.Backup != pb.me {
+		reply.Err = ErrWrongServer
+		return nil
+	}
+
+	//  Update backup's database
+	pb.table = args.DB
+	pb.reqTable = args.ReqDB
+
+	reply.Err = OK
 	return nil
 }
 
@@ -99,26 +219,22 @@ func (pb *PBServer) tick() {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
-	vn := pb.view.Viewnum
-	vs := pb.vs
-	v, _ := vs.Ping(vn)
-	changed := false
-	if pb.view.Backup == "" && v.Backup != "" && pb.view.Primary == pb.me {
-		changed = true
+	nView, _ := pb.vs.Ping(pb.currView.Viewnum)
+
+	if nView.Primary == pb.me && pb.currView.Backup != nView.Backup && nView.Backup != "" {
+		pb.isSync = true
 	}
-	if v.Viewnum != pb.view.Viewnum {
-		pb.view = v
-	}
-	if changed {
-		log.Println("Primary -> Backup : sending init")
-		var init_args InitArgs
-		init_args.Table = pb.table
-		var init_reply InitReply
-		ok := call(v.Backup, "PBServer.Init", &init_args, &init_reply)
-		if !ok {
-			log.Print("Problem with init")
+	if pb.isSync == true {
+		pb.isSync = false
+		args := DatabaseToBackupArgs{pb.table, pb.reqTable}
+		var reply DatabaseToBackupReply
+
+		ok := call(nView.Backup, "PBServer.DatabaseToBackup", args, &reply)
+		if !ok || reply.Err != OK {
+			pb.isSync = true
 		}
 	}
+	pb.currView = nView
 }
 
 // tell the server to shut itself down.
@@ -132,6 +248,10 @@ func StartServer(vshost string, me string) *PBServer {
 	pb := new(PBServer)
 	pb.me = me
 	pb.vs = viewservice.MakeClerk(me, vshost)
+	pb.currView = viewservice.View{Primary: "", Backup: "", Viewnum: 0}
+	pb.table = make(map[string]string)
+	pb.reqTable = make(map[int64]Det)
+	pb.isSync = false
 	pb.finish = make(chan interface{})
 	// Your pb.* initializations here.
 

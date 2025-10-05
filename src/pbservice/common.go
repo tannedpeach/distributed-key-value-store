@@ -11,34 +11,55 @@ const (
 type Err string
 
 type PutArgs struct {
-	Key    string
-	Value  string
-	DoHash bool // For PutHash
+	Key      string
+	Value    string
+	DoHash   bool
+	Op       string
+	ServerId int64 // For PutHash
 	// You'll have to add definitions here.
 
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
 }
-type InitArgs struct {
-	Table map[string]string
+
+type AppendArgs struct {
+	Key      string
+	Value    string
+	Op       string
+	ServerId int64
+	// You'll have to add definitions here.
+
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
 }
 
-type InitReply struct {
+type AppendReply struct {
 	Err Err
 }
+
 type PutReply struct {
 	Err           Err
 	PreviousValue string // For PutHash
 }
 
 type GetArgs struct {
-	Key string
+	Key      string
+	ServerId int64
 	// You'll have to add definitions here.
 }
 
 type GetReply struct {
 	Err   Err
 	Value string
+}
+
+type DatabaseToBackupArgs struct {
+	DB    map[string]string
+	ReqDB map[int64]Det
+}
+
+type DatabaseToBackupReply struct {
+	Err Err
 }
 
 // Your RPC definitions here.
