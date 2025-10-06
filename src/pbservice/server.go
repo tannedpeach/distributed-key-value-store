@@ -58,7 +58,7 @@ func (pb *PBServer) UpdateBackupPut(args *AppendArgs, reply *AppendReply) error 
 
 	//check if we've arleady seen this
 	prev, ok := pb.reqTable[args.ServerId]
-	if ok && prev.Key == args.Key && prev.Value == args.Value && prev.Oper == args.Op {
+	if ok && prev.Key == args.Key && prev.Value == args.InputValue && prev.Oper == args.Op {
 		reply.Err = OK
 		return nil
 	}
@@ -69,7 +69,7 @@ func (pb *PBServer) UpdateBackupPut(args *AppendArgs, reply *AppendReply) error 
 		p := pb.table[args.Key]
 		pb.table[args.Key] = p + args.Value
 	}
-	pb.reqTable[args.ServerId] = Det{args.Key, args.Value, args.Op, ""}
+	pb.reqTable[args.ServerId] = Det{args.Key, args.InputValue, args.Op, args.PreviousValue}
 	reply.Err = OK
 
 	return nil
@@ -102,12 +102,15 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
 	}
 
 	// update table
+	var valueToStore string
 	if args.DoHash {
 		// For PutHash, store hash(old_value + new_value)
 		h := hash(prevValue + args.Value)
-		pb.table[args.Key] = strconv.Itoa(int(h))
+		valueToStore = strconv.Itoa(int(h))
+		pb.table[args.Key] = valueToStore
 	} else {
-		pb.table[args.Key] = args.Value
+		valueToStore = args.Value
+		pb.table[args.Key] = valueToStore
 	}
 
 	pb.reqTable[args.ServerId] = Det{args.Key, args.Value, "Put", prevValue}
@@ -116,7 +119,14 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
 
 	// update backup server
 	if pb.currView.Backup != "" {
-		backupArgs := &AppendArgs{args.Key, args.Value, "Put", args.ServerId}
+		backupArgs := &AppendArgs{
+			Key:           args.Key,
+			Value:         valueToStore,
+			InputValue:    args.Value,
+			Op:            "Put",
+			ServerId:      args.ServerId,
+			PreviousValue: prevValue,
+		}
 		var backupReply AppendReply
 		ok := call(pb.currView.Backup, "PBServer.UpdateBackupPut", backupArgs, &backupReply)
 		if !ok || backupReply.Err != OK {
@@ -135,8 +145,8 @@ func (pb *PBServer) GetToBackup(args *GetArgs, reply *GetReply) error {
 
 	//  Check if we have seen this request before, and if so, return previously calculated value
 	prev, ok := pb.reqTable[args.ServerId]
-	if ok && prev.Key == args.Key {
-		reply.Value = pb.table[args.Key]
+	if ok && prev.Key == args.Key && prev.Oper == "Get" {
+		reply.Value = prev.Value
 		reply.Err = OK
 		return nil
 	}
@@ -150,7 +160,7 @@ func (pb *PBServer) GetToBackup(args *GetArgs, reply *GetReply) error {
 		reply.Err = ErrNoKey
 	}
 	//  Update requests map
-	pb.reqTable[args.ServerId] = Det{args.Key, "", "Get", ""}
+	pb.reqTable[args.ServerId] = Det{args.Key, reply.Value, "Get", ""}
 
 	return nil
 }
@@ -164,8 +174,8 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 	}
 
 	prev, ok := pb.reqTable[args.ServerId]
-	if ok && prev.Key == args.Key {
-		reply.Value = pb.table[args.Key]
+	if ok && prev.Key == args.Key && prev.Oper == "Get" {
+		reply.Value = prev.Value
 		reply.Err = OK
 		return nil
 	}
@@ -178,16 +188,21 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 		reply.Err = ErrNoKey
 	}
 	//  Update requests map
-	pb.reqTable[args.ServerId] = Det{args.Key, "", "Get", ""}
+	pb.reqTable[args.ServerId] = Det{args.Key, reply.Value, "Get", ""}
 
 	//  Propagate update to the backup server
 	if pb.currView.Backup != "" {
-		//  Send an RPC request, wait for the reply
-		ok := call(pb.currView.Backup, "PBServer.GetToBackup", args, &reply)
+		//  Save the value we're returning to the client
+		valueToReturn := reply.Value
+		//  Send an RPC request, use a separate reply for the backup
+		var backupReply GetReply
+		ok := call(pb.currView.Backup, "PBServer.GetToBackup", args, &backupReply)
 		//  If something went wrong (e.g. server crashed and update didn't go through)
-		if !ok || reply.Err == ErrWrongServer || reply.Value != pb.table[args.Key] {
+		if !ok || backupReply.Err == ErrWrongServer || backupReply.Value != valueToReturn {
 			pb.isSync = true
 		}
+		//  Restore the reply value for the client
+		reply.Value = valueToReturn
 	}
 
 	return nil

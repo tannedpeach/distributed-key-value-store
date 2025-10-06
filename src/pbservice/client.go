@@ -71,6 +71,11 @@ func (ck *Clerk) Get(key string) string {
 	args := &GetArgs{Key: key, ServerId: nrand()}
 	var reply GetReply
 
+	for ck.currView.Primary == "" {
+		time.Sleep(viewservice.PingInterval) // be nice, don't hammer the viewserver
+		ck.currView, _ = ck.vs.Get()
+	}
+
 	ok := call(ck.currView.Primary, "PBServer.Get", args, &reply)
 	for ok == false || reply.Err == ErrWrongServer {
 		time.Sleep(viewservice.PingInterval)
@@ -90,6 +95,12 @@ func (ck *Clerk) Get(key string) string {
 func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
 	args := &PutArgs{Key: key, Value: value, DoHash: dohash, ServerId: nrand()}
 	var reply PutReply
+
+	for ck.currView.Primary == "" {
+		time.Sleep(viewservice.PingInterval) // be nice, don't hammer the viewserver
+		ck.currView, _ = ck.vs.Get()
+	}
+
 	ok := call(ck.currView.Primary, "PBServer.Put", args, &reply)
 	for ok == false || reply.Err != OK {
 		time.Sleep(viewservice.PingInterval)

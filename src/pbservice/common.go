@@ -23,10 +23,12 @@ type PutArgs struct {
 }
 
 type AppendArgs struct {
-	Key      string
-	Value    string
-	Op       string
-	ServerId int64
+	Key           string
+	Value         string // Value to store in the table
+	InputValue    string // Original input value for duplicate detection
+	Op            string
+	ServerId      int64
+	PreviousValue string
 	// You'll have to add definitions here.
 
 	// Field names must start with capital letters,
