@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
-	"src/viewservice"
+	"viewservice"
 	"strconv"
 	"sync"
 	"syscall"

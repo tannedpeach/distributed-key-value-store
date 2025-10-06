@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/rpc"
-	"src/viewservice"
+	"viewservice"
 	"time"
 )
 
