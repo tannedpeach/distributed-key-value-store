@@ -69,15 +69,6 @@ type PingReply struct {
 // Get(): fetch the current view, without volunteering
 // to be a server. mostly for clients of the p/b service,
 // and for testing.
-func ConvertToString(server string) string {
-	var s string
-	if server == "" {
-		s = "none"
-	} else {
-		s = server[len(server)-1:]
-	}
-	return s
-}
 
 type GetArgs struct {
 }
