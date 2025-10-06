@@ -51,6 +51,9 @@ type PBServer struct {
 }
 
 func (pb *PBServer) UpdateBackupPut(args *AppendArgs, reply *AppendReply) error {
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
 	if pb.currView.Backup != pb.me {
 		reply.Err = ErrWrongServer
 		return nil
@@ -137,6 +140,9 @@ func (pb *PBServer) Put(args *PutArgs, reply *PutReply) error {
 	return nil
 }
 func (pb *PBServer) GetToBackup(args *GetArgs, reply *GetReply) error {
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
 	//  Should only perform update on the backup server
 	if pb.currView.Backup != pb.me {
 		reply.Err = ErrWrongServer
@@ -209,10 +215,14 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 }
 
 func (pb *PBServer) DatabaseToBackup(args *DatabaseToBackupArgs, reply *DatabaseToBackupReply) error {
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
 	//  Ping viewservice for current view
 	nView, err := pb.vs.Ping(pb.currView.Viewnum)
 	if err != nil {
-		fmt.Errorf("Ping(%v) failed", pb.currView.Viewnum)
+		reply.Err = ErrWrongServer
+		return nil
 	}
 
 	//  Should only perform update on the backup server
