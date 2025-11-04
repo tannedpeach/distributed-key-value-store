@@ -2,21 +2,29 @@ package kvpaxos
 
 import "net/rpc"
 import "fmt"
+import	"crypto/rand"
+import "math/big"
+import "time"
 
 type Clerk struct {
-  servers []string
-  // You will have to modify this struct.
+	servers []string
+	// You will have to modify this struct.
+	clientId int64
+	seqNum   int64
 }
-
 
 func MakeClerk(servers []string) *Clerk {
-  ck := new(Clerk)
-  ck.servers = servers
-  // You'll have to add code here.
-  return ck
+	ck := new(Clerk)
+	ck.servers = servers
+	// You'll have to add code here.
+	// Generate a unique client ID
+	max := big.NewInt(int64(1) << 62)
+	bigx, _ := rand.Int(rand.Reader, max)
+	ck.clientId = bigx.Int64()
+	ck.seqNum = 0
+	return ck
 }
 
-//
 // call() sends an RPC to the rpcname handler on server srv
 // with arguments args, waits for the reply, and leaves the
 // reply in reply. the reply argument should be a pointer
@@ -31,32 +39,43 @@ func MakeClerk(servers []string) *Clerk {
 //
 // please use call() to send all RPCs, in client.go and server.go.
 // please don't change this function.
-//
 func call(srv string, rpcname string,
-          args interface{}, reply interface{}) bool {
-  c, errx := rpc.Dial("unix", srv)
-  if errx != nil {
-    return false
-  }
-  defer c.Close()
-    
-  err := c.Call(rpcname, args, reply)
-  if err == nil {
-    return true
-  }
+	args interface{}, reply interface{}) bool {
+	c, errx := rpc.Dial("unix", srv)
+	if errx != nil {
+		return false
+	}
+	defer c.Close()
 
-  fmt.Println(err)
-  return false
+	err := c.Call(rpcname, args, reply)
+	if err == nil {
+		return true
+	}
+
+	fmt.Println(err)
+	return false
 }
 
-//
 // fetch the current value for a key.
 // returns "" if the key does not exist.
 // keeps trying forever in the face of all other errors.
 //
 func (ck *Clerk) Get(key string) string {
-  // You will have to modify this function.
-  return ""
+	// You will have to modify this function.
+	ck.seqNum++
+
+	args := &GetArgs{Key: key, ClientId: ck.clientId, SeqNum: ck.seqNum}
+
+	for {
+		for _, srv := range ck.servers {
+			var reply GetReply
+			ok := call(srv, "KVPaxos.Get", args, &reply)
+			if ok && reply.Err == OK {
+				return reply.Value
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 //
@@ -64,14 +83,27 @@ func (ck *Clerk) Get(key string) string {
 // keeps trying until it succeeds.
 //
 func (ck *Clerk) PutExt(key string, value string, dohash bool) string {
-  // You will have to modify this function.
-  return ""
+	// You will have to modify this function.
+	ck.seqNum++
+
+	args := &PutArgs{Key: key, Value: value, DoHash: dohash, ClientId: ck.clientId, SeqNum: ck.seqNum}
+
+	for {
+		for _, srv := range ck.servers {
+			var reply PutReply
+			ok := call(srv, "KVPaxos.Put", args, &reply)
+			if ok && reply.Err == OK {
+				return reply.PreviousValue
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func (ck *Clerk) Put(key string, value string) {
-  ck.PutExt(key, value, false)
+	ck.PutExt(key, value, false)
 }
 func (ck *Clerk) PutHash(key string, value string) string {
-  v := ck.PutExt(key, value, true)
-  return v
+	v := ck.PutExt(key, value, true)
+	return v
 }
