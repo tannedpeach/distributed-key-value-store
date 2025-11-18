@@ -198,8 +198,7 @@ func (sm *ShardMaster) rebalance(config *Config) {
 			// find shard from overloaded group or unassigned
 			for i := range config.Shards {
 				owner := config.Shards[i]
-				if owner == 0 || shardCount[owner] > target ||
-					(shardCount[owner] == target+1 && owner < gid) {
+				if owner == 0 || shardCount[owner] > target{
 					config.Shards[i] = gid
 					shardCount[owner]--
 					shardCount[gid]++
