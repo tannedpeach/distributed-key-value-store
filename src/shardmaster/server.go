@@ -1,26 +1,28 @@
 package shardmaster
 
-import "net"
-import "fmt"
-import "net/rpc"
-import "log"
-import "paxos"
-import "sync"
-import "os"
-import "syscall"
-import "encoding/gob"
-import "math/rand"
-import "time"
-import "sort"
+import (
+	"encoding/gob"
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"net/rpc"
+	"os"
+	"paxos"
+	"sort"
+	"sync"
+	"syscall"
+	"time"
+)
 
 type ShardMaster struct {
-	mu sync.Mutex
-	l net.Listener
-	me int
-	dead bool // for testing
+	mu         sync.Mutex
+	l          net.Listener
+	me         int
+	dead       bool // for testing
 	unreliable bool // for testing
-	px *paxos.Paxos
-  
+	px         *paxos.Paxos
+
 	configs []Config // indexed by config num
 	applied int      // highest Paxos seq
 }
@@ -65,7 +67,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	op := Op{Operation: "Move", Shard: args.Shard, GID: args.GID,}
+	op := Op{Operation: "Move", Shard: args.Shard, GID: args.GID}
 
 	sm.processOp(op)
 	return nil
@@ -75,10 +77,22 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	// Your code here.
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	op := Op{Operation: "Query", Num: args.Num}
-	sm.processOp(op)
+
+	// Catch up with any pending Paxos operations
+	for {
+		decided, val := sm.px.Status(sm.applied + 1)
+		if !decided {
+			break
+		}
+		op := val.(Op)
+		sm.applyOp(op)
+		sm.applied++
+		sm.px.Done(sm.applied)
+	}
+
+	// Query is read-only, return the requested config
 	if args.Num == -1 || args.Num >= len(sm.configs) {
-		reply.Config = sm.configs[sm.applied]
+		reply.Config = sm.configs[len(sm.configs)-1]
 	} else {
 		reply.Config = sm.configs[args.Num]
 	}
@@ -138,9 +152,14 @@ func (sm *ShardMaster) sameOp(op1, op2 Op) bool {
 }
 
 func (sm *ShardMaster) applyOp(op Op) {
+	// Query operations don't create new configs
+	if op.Operation == "Query" {
+		return
+	}
+
 	lastConfig := sm.configs[len(sm.configs)-1]
 
-	newConfig := Config{Num:lastConfig.Num + 1, Shards: lastConfig.Shards, Groups: make(map[int64][]string)}
+	newConfig := Config{Num: lastConfig.Num + 1, Shards: lastConfig.Shards, Groups: make(map[int64][]string)}
 
 	// copy groups map
 	for gid, servers := range lastConfig.Groups {
@@ -198,7 +217,7 @@ func (sm *ShardMaster) rebalance(config *Config) {
 			// find shard from overloaded group or unassigned
 			for i := range config.Shards {
 				owner := config.Shards[i]
-				if owner == 0 || shardCount[owner] > target{
+				if owner == 0 || shardCount[owner] > target {
 					config.Shards[i] = gid
 					shardCount[owner]--
 					shardCount[gid]++
@@ -233,64 +252,62 @@ func (sm *ShardMaster) Kill() {
 	sm.px.Kill()
 }
 
-//
 // servers[] contains the ports of the set of
 // servers that will cooperate via Paxos to
 // form the fault-tolerant shardmaster service.
 // me is the index of the current server in servers[].
-//
 func StartServer(servers []string, me int) *ShardMaster {
 	gob.Register(Op{})
 
 	sm := new(ShardMaster)
 	sm.me = me
-  
+
 	sm.configs = make([]Config, 1)
 	sm.configs[0].Groups = map[int64][]string{}
-  
+
 	rpcs := rpc.NewServer()
 	rpcs.Register(sm)
-  
+
 	sm.px = paxos.Make(servers, me, rpcs)
-  
+
 	os.Remove(servers[me])
-	l, e := net.Listen("unix", servers[me]);
+	l, e := net.Listen("unix", servers[me])
 	if e != nil {
-	  log.Fatal("listen error: ", e);
+		log.Fatal("listen error: ", e)
 	}
 	sm.l = l
-  
+
 	// please do not change any of the following code,
 	// or do anything to subvert it.
-  
+
 	go func() {
-	  for sm.dead == false {
-		conn, err := sm.l.Accept()
-		if err == nil && sm.dead == false {
-		  if sm.unreliable && (rand.Int63() % 1000) < 100 {
-			// discard the request.
-			conn.Close()
-		  } else if sm.unreliable && (rand.Int63() % 1000) < 200 {
-			// process the request but force discard of reply.
-			c1 := conn.(*net.UnixConn)
-			f, _ := c1.File()
-			err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
-			if err != nil {
-			  fmt.Printf("shutdown: %v\n", err)
+		for sm.dead == false {
+			conn, err := sm.l.Accept()
+			if err == nil && sm.dead == false {
+				if sm.unreliable && (rand.Int63()%1000) < 100 {
+					// discard the request.
+					conn.Close()
+				} else if sm.unreliable && (rand.Int63()%1000) < 200 {
+					// process the request but force discard of reply.
+					c1 := conn.(*net.UnixConn)
+					f, _ := c1.File()
+					err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
+					if err != nil {
+						fmt.Printf("shutdown: %v\n", err)
+					}
+					go rpcs.ServeConn(conn)
+				} else {
+					go rpcs.ServeConn(conn)
+				}
+			} else if err == nil {
+				conn.Close()
 			}
-			go rpcs.ServeConn(conn)
-		  } else {
-			go rpcs.ServeConn(conn)
-		  }
-		} else if err == nil {
-		  conn.Close()
+			if err != nil && sm.dead == false {
+				fmt.Printf("ShardMaster(%v) accept: %v\n", me, err.Error())
+				sm.Kill()
+			}
 		}
-		if err != nil && sm.dead == false {
-		  fmt.Printf("ShardMaster(%v) accept: %v\n", me, err.Error())
-		  sm.Kill()
-		}
-	  }
 	}()
-  
+
 	return sm
 }
