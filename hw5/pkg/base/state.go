@@ -52,7 +52,6 @@ func (s *State) AddNode(address Address, node Node, blockList []Address) {
 	s.nodes[address] = node
 	s.blockLists[address] = blockList
 	s.nodeHash += node.Hash()
-	return
 }
 
 func (s *State) UpdateNode(address Address, node Node) {
@@ -77,7 +76,6 @@ func (s *State) GetNode(address Address) Node {
 
 func (s *State) Send(meg Message) {
 	s.Network = append(s.Network, meg)
-	return
 }
 
 func (s *State) Clone() *State {
@@ -185,8 +183,22 @@ func (s *State) isMessageReachable(index int) (bool, *State) {
 }
 
 func (s *State) HandleMessage(index int, deleteMessage bool) (result []*State) {
-	//TODO: implement it
-	panic("implement me")
+	message := s.Network[index]
+	to := message.To()
+
+	node := s.nodes[to]
+	newNodes := node.MessageHandler(message)
+
+	for _, newNode := range newNodes {
+		newState := s.Inherit(HandleEvent(message))
+		if deleteMessage {
+			newState.DeleteMessage(index)
+		}
+		newState.UpdateNode(to, newNode)
+		result = append(result, newState)
+	}
+
+	return result
 }
 
 func (s *State) DeleteMessage(index int) {
@@ -226,16 +238,22 @@ func (s *State) NextStates() []*State {
 			continue
 		}
 
-		// TODO: Drop off a message
+		// Drop off a message
 		if s.isDropOff {
+			dropState := s.Inherit(DropOffEvent(s.Network[i]))
+			dropState.DeleteMessage(i)
+			nextStates = append(nextStates, dropState)
 		}
 
-		// TODO: Message arrives Normally. (use HandleMessage)
+		// Message arrives Normally. (use HandleMessage)
+		normalStates := s.HandleMessage(i, true)
+		nextStates = append(nextStates, normalStates...)
 
-		// TODO: Message arrives but the message is duplicated. The same message may come later again
+		// Message arrives but the message is duplicated. The same message may come later again
 		// (use HandleMessage)
 		if s.isDuplicate {
-
+			duplicateStates := s.HandleMessage(i, false)
+			nextStates = append(nextStates, duplicateStates...)
 		}
 
 	}
@@ -245,16 +263,28 @@ func (s *State) NextStates() []*State {
 	for _, address := range s.addresses {
 		node := s.nodes[address]
 
-		//TODO: call the timer (use TriggerNodeTimer)
+		// call the timer (use TriggerNodeTimer)
+		if !IsNil(node.NextTimer()) {
+			timerStates := s.TriggerNodeTimer(address, node)
+			nextStates = append(nextStates, timerStates...)
+		}
 	}
 
 	return nextStates
 }
 
 func (s *State) TriggerNodeTimer(address Address, node Node) []*State {
-	//TODO: implement it
-	panic("implement me")
+	timer := node.NextTimer()
+	newNodes := node.TriggerTimer()
 
+	result := make([]*State, 0, len(newNodes))
+	for _, newNode := range newNodes {
+		newState := s.Inherit(TriggerEvent(address, timer))
+		newState.UpdateNode(address, newNode)
+		result = append(result, newState)
+	}
+
+	return result
 }
 
 func (s *State) RandomNextState() *State {
@@ -266,22 +296,45 @@ func (s *State) RandomNextState() *State {
 		timerAddresses = append(timerAddresses, addr)
 	}
 
-	roll := rand.Intn(len(s.Network) + len(timerAddresses))
+	totalEvents := len(s.Network) + len(timerAddresses)
+	if totalEvents == 0 {
+		return s.Clone()
+	}
+
+	roll := rand.Intn(totalEvents)
 
 	if roll < len(s.Network) {
+		// check if it is a local call
+		if s.isLocalCall(roll) {
+			states := s.HandleMessage(roll, true)
+			if len(states) > 0 {
+				return states[0]
+			}
+			return s.Clone()
+		}
+
 		// check Network Partition
 		reachable, newState := s.isMessageReachable(roll)
 		if !reachable {
 			return newState
 		}
 
-		//TODO: handle message and return one state
+		// handle message and return one state
+		states := s.HandleMessage(roll, true)
+		if len(states) > 0 {
+			return states[0]
+		}
+		return s.Clone()
 	}
 
-	// TODO: trigger timer and return one state
+	// trigger timer and return one state
 	address := timerAddresses[roll-len(s.Network)]
 	node := s.nodes[address]
-
+	states := s.TriggerNodeTimer(address, node)
+	if len(states) > 0 {
+		return states[0]
+	}
+	return s.Clone()
 }
 
 // Calculate the hash function of a State based on its nodeHash and networkHash.
